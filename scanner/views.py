@@ -1,23 +1,35 @@
+import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
+from django.views.decorators.http import require_http_methods
+
+from .utils import normalize_url
+
 
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
 def scan_url(request):
-    if request.method != "POST":
+    if request.method == "GET":
         return JsonResponse({"error": "POST required"}, status=405)
 
+    # POST
     try:
-        data = json.loads(request.body or "{}")
-        url = data.get("url", "").strip()
-        if not url:
-            return JsonResponse({"error": "url is required"}, status=400)
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
-        return JsonResponse({
-            "url": url,
+    raw_url = payload.get("url")
+    try:
+        normalized = normalize_url(raw_url)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+    # For now keep your placeholder response, but return normalized URL
+    return JsonResponse(
+        {
+            "url": normalized,
             "score": 0,
             "risk_level": "unknown",
-            "message": "scan endpoint working"
-        })
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "invalid JSON"}, status=400)
+            "message": "scan endpoint working",
+        }
+    )
