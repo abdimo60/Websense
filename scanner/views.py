@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .checks.tls import check_tls
 from .models import URL, Scan
 from .utils import normalize_url
 
@@ -27,12 +28,33 @@ def scan_url(request):
 
     url_obj, _ = URL.objects.get_or_create(canonical_url=normalized)
 
+    # TLS check + simple scoring
+    tls = check_tls(normalized)
+
+    score = 100
+    risk = Scan.RISK_LOW
+    confidence = Scan.CONF_MEDIUM
+
+    checks = {"normalized": True, "tls": tls.__dict__}
+
+    if not tls.ok:
+        score -= 30
+        risk = Scan.RISK_MEDIUM
+
+    if tls.expired:
+        score = min(score, 20)
+        risk = Scan.RISK_HIGH
+
+    if tls.days_to_expiry is not None and tls.days_to_expiry < 14 and not tls.expired:
+        score -= 10
+        risk = Scan.RISK_MEDIUM
+
     scan = Scan.objects.create(
         url=url_obj,
-        score=0,
-        risk_level=Scan.RISK_UNKNOWN,
-        confidence=Scan.CONF_LOW,
-        checks={"normalized": True},
+        score=max(0, min(100, score)),
+        risk_level=risk,
+        confidence=confidence,
+        checks=checks,
     )
 
     return JsonResponse(
@@ -42,6 +64,7 @@ def scan_url(request):
             "score": scan.score,
             "risk_level": scan.risk_level,
             "confidence": scan.confidence,
+            "checks": scan.checks,
             "message": "scan saved",
         }
     )
