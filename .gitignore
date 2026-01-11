@@ -13,3 +13,7 @@ db.sqlite3
 .vscode/
 Thumbs.db
 .DS_Store
+
+# Env
+.env
+.env.*
