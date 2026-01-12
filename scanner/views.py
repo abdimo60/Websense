@@ -4,10 +4,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .checks.heuristics import check_heuristics
 from .checks.safebrowsing import check_safe_browsing
 from .checks.tls import check_tls
 from .models import URL, Scan
-from .scoring import compute_score  # NEW
+from .scoring import compute_score
 from .utils import normalize_url
 
 
@@ -17,7 +18,6 @@ def scan_url(request):
     if request.method == "GET":
         return JsonResponse({"error": "POST required"}, status=405)
 
-    
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -31,21 +31,19 @@ def scan_url(request):
 
     url_obj, _ = URL.objects.get_or_create(canonical_url=normalized)
 
-    
     tls = check_tls(normalized)
     sb = check_safe_browsing(normalized)
+    heur = check_heuristics(normalized)
 
-    
     checks = {
         "normalized": True,
         "tls": tls.__dict__,
         "safe_browsing": sb.__dict__,
+        "heuristics": heur.__dict__,
     }
 
-    
     result = compute_score(checks)
 
-    
     scan = Scan.objects.create(
         url=url_obj,
         score=result.score,
@@ -54,7 +52,6 @@ def scan_url(request):
         checks=checks,
     )
 
-    
     return JsonResponse(
         {
             "scan_id": scan.id,
@@ -63,7 +60,7 @@ def scan_url(request):
             "risk_level": scan.risk_level,
             "confidence": scan.confidence,
             "checks": scan.checks,
-            "reasons": result.reasons,  
+            "reasons": result.reasons,
             "message": "scan saved",
         }
     )

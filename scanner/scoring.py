@@ -32,6 +32,7 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     tls = checks.get("tls") or {}
     sb = checks.get("safe_browsing") or {}
+    heur = checks.get("heuristics") or {}
 
     sb_status = sb.get("status")
     if sb_status == "flagged":
@@ -64,6 +65,14 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
             risk = max_risk(risk, "medium")
             confidence = max_confidence(confidence, "low")
             reasons["tls_expiry_soon"] = f"TLS expires soon ({days_to_expiry} days)."
+
+    heur_delta = heur.get("score_delta")
+    if isinstance(heur_delta, int):
+        score += heur_delta
+
+    if heur.get("suspicious"):
+        risk = max_risk(risk, "medium")
+        reasons["heuristics"] = heur.get("reasons") or ["Heuristic indicators triggered."]
 
     score = clamp(int(score))
     return ScoreResult(score=score, risk=risk, confidence=confidence, reasons=reasons)
