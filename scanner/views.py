@@ -4,8 +4,10 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .checks.safebrowsing import check_safe_browsing
 from .checks.tls import check_tls
 from .models import URL, Scan
+from .scoring import compute_score  # NEW
 from .utils import normalize_url
 
 
@@ -15,6 +17,7 @@ def scan_url(request):
     if request.method == "GET":
         return JsonResponse({"error": "POST required"}, status=405)
 
+    
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -28,35 +31,30 @@ def scan_url(request):
 
     url_obj, _ = URL.objects.get_or_create(canonical_url=normalized)
 
-    # TLS check + simple scoring
+    
     tls = check_tls(normalized)
+    sb = check_safe_browsing(normalized)
 
-    score = 100
-    risk = Scan.RISK_LOW
-    confidence = Scan.CONF_MEDIUM
+    
+    checks = {
+        "normalized": True,
+        "tls": tls.__dict__,
+        "safe_browsing": sb.__dict__,
+    }
 
-    checks = {"normalized": True, "tls": tls.__dict__}
+    
+    result = compute_score(checks)
 
-    if not tls.ok:
-        score -= 30
-        risk = Scan.RISK_MEDIUM
-
-    if tls.expired:
-        score = min(score, 20)
-        risk = Scan.RISK_HIGH
-
-    if tls.days_to_expiry is not None and tls.days_to_expiry < 14 and not tls.expired:
-        score -= 10
-        risk = Scan.RISK_MEDIUM
-
+    
     scan = Scan.objects.create(
         url=url_obj,
-        score=max(0, min(100, score)),
-        risk_level=risk,
-        confidence=confidence,
+        score=result.score,
+        risk_level=result.risk,
+        confidence=result.confidence,
         checks=checks,
     )
 
+    
     return JsonResponse(
         {
             "scan_id": scan.id,
@@ -65,6 +63,7 @@ def scan_url(request):
             "risk_level": scan.risk_level,
             "confidence": scan.confidence,
             "checks": scan.checks,
+            "reasons": result.reasons,  
             "message": "scan saved",
         }
     )
