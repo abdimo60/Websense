@@ -7,6 +7,7 @@ class URL(models.Model):
     def __str__(self):
         return self.canonical_url
 
+
 class Scan(models.Model):
     RISK_UNKNOWN = "unknown"
     RISK_LOW = "low"
@@ -30,13 +31,27 @@ class Scan(models.Model):
         (CONF_HIGH, "High"),
     ]
 
+    # NEW: UI state (drives headline/colour/advice)
+    STATE_SAFE = "SAFE"
+    STATE_BE_CAREFUL = "BE_CAREFUL"
+    STATE_UNSAFE = "UNSAFE"
+
+    STATE_CHOICES = [
+        (STATE_SAFE, "Safe"),
+        (STATE_BE_CAREFUL, "Be careful"),
+        (STATE_UNSAFE, "Unsafe"),
+    ]
+
     url = models.ForeignKey(URL, on_delete=models.CASCADE, related_name="scans")
     score = models.IntegerField(default=0)
     risk_level = models.CharField(max_length=20, choices=RISK_CHOICES, default=RISK_UNKNOWN)
     confidence = models.CharField(max_length=20, choices=CONF_CHOICES, default=CONF_LOW)
+
+    # NEW FIELD
+    state = models.CharField(max_length=20, choices=STATE_CHOICES, default=STATE_BE_CAREFUL)
+
     created_at = models.DateTimeField(auto_now_add=True)
     checks = models.JSONField(default=dict, blank=True)
 
     def __str__(self) -> str:
-        return f"Scan {self.id} ({self.risk_level})"
-    
+        return f"Scan {self.id} ({self.state})"

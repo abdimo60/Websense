@@ -1,6 +1,7 @@
 import json
 
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -10,6 +11,10 @@ from .checks.tls import check_tls
 from .models import URL, Scan
 from .scoring import compute_score
 from .utils import normalize_url
+
+
+def index(request):
+    return render(request, "scanner/home.html")
 
 
 @csrf_exempt
@@ -49,6 +54,7 @@ def scan_url(request):
         score=result.score,
         risk_level=result.risk,
         confidence=result.confidence,
+        state=result.state,
         checks=checks,
     )
 
@@ -56,11 +62,13 @@ def scan_url(request):
         {
             "scan_id": scan.id,
             "url": normalized,
-            "score": scan.score,
-            "risk_level": scan.risk_level,
-            "confidence": scan.confidence,
-            "checks": scan.checks,
+            "score": result.score,
+            "state": result.state,
             "reasons": result.reasons,
-            "message": "scan saved",
+            "details": {
+                "risk_level": result.risk,
+                "confidence": result.confidence,
+                "checks": checks,
+            },
         }
     )

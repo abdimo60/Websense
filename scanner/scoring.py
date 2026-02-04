@@ -7,6 +7,7 @@ class ScoreResult:
     score: int
     risk: str
     confidence: str
+    state: str
     reasons: Dict[str, Any]
 
 
@@ -24,6 +25,15 @@ def max_confidence(current: str, new: str) -> str:
     return new if order.get(new, 0) > order.get(current, 0) else current
 
 
+def clamp_score_for_state(score: int, state: str) -> int:
+    score = clamp(score)
+    if state == "UNSAFE":
+        return clamp(score, 0, 20)
+    if state == "BE_CAREFUL":
+        return clamp(score, 35, 69)
+    return clamp(score, 70, 100)
+
+
 def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     score = 100
     risk = "low"
@@ -36,10 +46,24 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     sb_status = sb.get("status")
     if sb_status == "flagged":
-        score = min(score, 10)
+        threats = sb.get("threats") or sb.get("matches") or []
+        text = " ".join(str(t) for t in threats).upper()
+
+        if "MALWARE" in text:
+            score = 5
+            reasons["safe_browsing"] = "Flagged by Google Safe Browsing (malware)."
+        elif "SOCIAL_ENGINEERING" in text or "PHISH" in text:
+            score = 8
+            reasons["safe_browsing"] = "Flagged by Google Safe Browsing (phishing)."
+        elif "UNWANTED" in text:
+            score = 12
+            reasons["safe_browsing"] = "Flagged by Google Safe Browsing (unwanted software)."
+        else:
+            score = 10
+            reasons["safe_browsing"] = "Flagged by Google Safe Browsing."
+
         risk = "high"
         confidence = "high"
-        reasons["safe_browsing"] = "Flagged by Google Safe Browsing."
     elif sb_status == "unavailable":
         confidence = max_confidence(confidence, "medium")
 
@@ -70,9 +94,28 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     if isinstance(heur_delta, int):
         score += heur_delta
 
-    if heur.get("suspicious"):
+    heur_suspicious = bool(heur.get("suspicious"))
+    if heur_suspicious:
         risk = max_risk(risk, "medium")
         reasons["heuristics"] = heur.get("reasons") or ["Heuristic indicators triggered."]
 
-    score = clamp(int(score))
-    return ScoreResult(score=score, risk=risk, confidence=confidence, reasons=reasons)
+    if sb_status == "flagged":
+        state = "UNSAFE"
+    else:
+        tls_problem = (not tls_ok) or tls_expired or (
+            isinstance(days_to_expiry, int) and days_to_expiry < 14
+        )
+        if tls_problem or heur_suspicious:
+            state = "BE_CAREFUL"
+        else:
+            state = "SAFE"
+
+    score = clamp_score_for_state(int(score), state)
+
+    return ScoreResult(
+        score=score,
+        risk=risk,
+        confidence=confidence,
+        state=state,
+        reasons=reasons,
+    )

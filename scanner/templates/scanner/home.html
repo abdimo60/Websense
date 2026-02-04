@@ -1,0 +1,201 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebSense</title>
+  <link rel="stylesheet" href="{% static 'scanner/styles.css' %}">
+</head>
+<body>
+  <h1>WebSense</h1>
+  <p class="muted">Paste a link. You’ll get a clear answer in plain English.</p>
+
+  <label for="url">Website link</label>
+  <input id="url" type="text" placeholder="https://example.com" />
+
+  <div class="row">
+    <button id="scanBtn" class="primary">Check link</button>
+    <button id="clearBtn" type="button">Clear</button>
+  </div>
+
+  <div id="result" class="card" style="display:none;"></div>
+
+  <script>
+    const urlInput = document.getElementById("url");
+    const resultEl = document.getElementById("result");
+    const scanBtn = document.getElementById("scanBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    function escapeHtml(s) {
+      return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+    }
+
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+    function uiForState(stateRaw) {
+      const state = String(stateRaw || "").toUpperCase();
+
+      if (state === "UNSAFE") {
+        return { tone: "no", pill: "UNSAFE", headline: "Do not open this link.", action: "Close it now. Do not enter any information.", showUncertainty: false };
+      }
+      if (state === "BE_CAREFUL") {
+        return { tone: "careful", pill: "BE CAREFUL", headline: "This link might be risky.", action: "Only open this if you trust who sent it.", showUncertainty: true };
+      }
+      return { tone: "ok", pill: "SAFE", headline: "This link looks safe.", action: "No obvious problems were found.", showUncertainty: false };
+    }
+
+    function scoreUi(score) {
+      const s = clamp(Number(score ?? 0), 0, 100);
+      return { s, pct: s + "%" };
+    }
+
+    function topReasons(data) {
+      const reasons = [];
+      const raw = data?.reasons || {};
+
+      for (const key of Object.keys(raw)) {
+        const value = raw[key];
+
+        if (key === "safe_browsing") { reasons.push("A trusted safety service says this link is dangerous."); continue; }
+        if (key === "tls") { reasons.push("This website does not have a secure connection."); continue; }
+        if (key === "tls_expired") { reasons.push("This website’s security has expired."); continue; }
+        if (key === "tls_expiry_soon") { reasons.push("This website’s security is about to expire."); continue; }
+
+        if (key === "heuristics") {
+          if (Array.isArray(value)) {
+            for (const r of value) {
+              const rr = String(r || "").toLowerCase();
+              if (rr.includes("long url")) reasons.push("The link is unusually long, which is common in scam links.");
+              else if (rr.includes("subdomain")) reasons.push("The website address looks unusual or confusing.");
+              else reasons.push("This link has warning signs.");
+            }
+          } else {
+            reasons.push("This link has warning signs.");
+          }
+        }
+      }
+
+      if (!reasons.length) {
+        const state = String(data?.state || "").toUpperCase();
+        if (state === "SAFE") return [];
+        reasons.push("This link has warning signs.");
+      }
+
+      return reasons.slice(0, 2);
+    }
+
+    function renderResult(data) {
+      const card = uiForState(data?.state);
+      const { s, pct } = scoreUi(data?.score);
+      const reasons = topReasons(data);
+      const hasWhy = reasons.length > 0;
+
+      const barColor = (card.tone === "no")
+        ? "#f5b5b5"
+        : (card.tone === "careful")
+          ? "#ffe0a3"
+          : "#b7e1c7";
+
+      const reasonsHtml = reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("");
+
+      const uncertaintyLine = card.showUncertainty
+        ? `<p class="mutedline">Not all dangerous links are known immediately, so this check may not catch very new scams.</p>`
+        : "";
+
+      const detailsJson = JSON.stringify(data?.details || {}, null, 2);
+
+      resultEl.innerHTML = `
+        <div class="pill ${card.tone}">${escapeHtml(card.pill)}</div>
+        <div class="headline">${escapeHtml(card.headline)}</div>
+        <p class="action">${escapeHtml(card.action)}</p>
+
+        <div class="actions">
+          ${hasWhy ? `<button type="button" id="whyBtn">Why?</button>` : ``}
+          <button type="button" id="detailsBtn">Technical details</button>
+        </div>
+
+        ${hasWhy ? `
+          <div id="whyWrap" class="panel" style="display:none;">
+            <div><strong>Why?</strong></div>
+            <ul>${reasonsHtml}</ul>
+          </div>
+        ` : ``}
+
+        <div id="detailsWrap" class="panel" style="display:none;">
+          <div class="scoreWrap">
+            <div class="scoreRow">
+              <div><strong>Safety score</strong></div>
+              <div class="scoreNum">${s} / 100</div>
+            </div>
+            <div class="bar">
+              <div class="fill" style="width:${pct}; background:${barColor};"></div>
+            </div>
+          </div>
+
+          ${uncertaintyLine}
+
+          <div style="margin-top:12px;"><strong>Technical details</strong></div>
+          <pre>${escapeHtml(detailsJson)}</pre>
+        </div>
+      `;
+
+      function toggle(el, btn, showText, hideText) {
+        const open = el.style.display !== "none";
+        el.style.display = open ? "none" : "block";
+        btn.textContent = open ? showText : hideText;
+      }
+
+      const detailsBtn = document.getElementById("detailsBtn");
+      const detailsWrap = document.getElementById("detailsWrap");
+      detailsBtn.onclick = () => toggle(detailsWrap, detailsBtn, "Technical details", "Hide details");
+
+      if (hasWhy) {
+        const whyBtn = document.getElementById("whyBtn");
+        const whyWrap = document.getElementById("whyWrap");
+        whyBtn.onclick = () => toggle(whyWrap, whyBtn, "Why?", "Hide why");
+      }
+
+      resultEl.style.display = "block";
+    }
+
+    function renderError(msg) {
+      resultEl.innerHTML = `
+        <div class="pill no">ERROR</div>
+        <div class="headline">${escapeHtml(msg)}</div>
+        <p class="action">Try again, or paste a full link like https://example.com</p>
+      `;
+      resultEl.style.display = "block";
+    }
+
+    scanBtn.addEventListener("click", async () => {
+      const url = urlInput.value.trim();
+      if (!url) { renderError("Paste a link first."); return; }
+
+      resultEl.style.display = "block";
+      resultEl.innerHTML = `<div class="pill careful">CHECKING</div><div class="headline">Checking…</div><p class="action">Please wait.</p>`;
+
+      try {
+        const res = await fetch("/api/scan/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+        if (!res.ok) { renderError(data?.error || "Scan failed."); return; }
+
+        renderResult(data);
+      } catch (err) {
+        renderError("Request failed.");
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      urlInput.value = "";
+      resultEl.style.display = "none";
+      resultEl.innerHTML = "";
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import scan_url
+from .views import index, scan_url
 
 urlpatterns = [
-    path("scan/", scan_url),
+    path("", index),
+    path("api/scan/", scan_url),
 ]
