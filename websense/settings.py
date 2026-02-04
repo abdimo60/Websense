@@ -130,3 +130,5 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / "scanner" / "static",
 ]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
