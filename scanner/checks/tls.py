@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
+# Result of a basic TLS certificate check
 @dataclass
 class TLSCheckResult:
     ok: bool
@@ -19,10 +20,17 @@ def check_tls(url: str, timeout: float = 4.0) -> TLSCheckResult:
     parts = urlsplit(url)
     host = parts.hostname
     if not host:
-        return TLSCheckResult(ok=False, expired=False, days_to_expiry=None, error="Missing hostname" )
+        return TLSCheckResult(
+    ok=False,
+    expired=False,
+    days_to_expiry=None,
+    not_after=None,
+    error="Missing hostname",
+)
     
     ctx = ssl.create_default_context()
-
+    
+# Open a direct TLS connection to read the certificate
     try:
         with socket.create_connection((host, 443), timeout=timeout) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:

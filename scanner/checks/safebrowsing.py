@@ -6,6 +6,7 @@ from typing import Optional
 import requests
 from django.conf import settings
 
+# Result from Google Safe Browsing
 @dataclass
 class SafeBrowsingResult:
     status: str
@@ -20,6 +21,7 @@ def check_safe_browsing(url: str, timeout: float = 4.0) -> SafeBrowsingResult:
     endpoint = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
     params = {"key": api_key}
 
+# Payload sent to Google Safe Browsing
     payload = {
         "client": {"clientId": "websense", "clientVersion": "0.1"},
         "threatInfo": {
@@ -39,6 +41,8 @@ def check_safe_browsing(url: str, timeout: float = 4.0) -> SafeBrowsingResult:
         r = requests.post(endpoint, params=params, json=payload, timeout=timeout)
         r.raise_for_status()
         data = r.json()
+        
+# If the API fails we do not block the rest of the scan
     except Exception as e:
         return SafeBrowsingResult(status="unavailable", threats=[], error=str(e))
     
@@ -46,5 +50,6 @@ def check_safe_browsing(url: str, timeout: float = 4.0) -> SafeBrowsingResult:
     if not matches:
         return SafeBrowsingResult(status="clean", threats=[])
     
+ # Reduce matches to unique threat types
     threat_types = sorted({m.get("threatType", "UNKNOWN") for m in matches})
     return SafeBrowsingResult(status="flagged", threats=threat_types)

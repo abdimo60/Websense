@@ -12,7 +12,7 @@ from .models import URL, Scan
 from .scoring import compute_score
 from .utils import normalize_url
 
-
+# Serve the single page frontend
 def index(request):
     return render(request, "scanner/home.html")
 
@@ -27,15 +27,18 @@ def scan_url(request):
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
         return JsonResponse({"error": "Invalid JSON body"}, status=400)
-
+    
+ # Validate and normalise before running any checks
     raw_url = payload.get("url")
     try:
         normalized = normalize_url(raw_url)
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
-
+    
+ # Reuse existing URL records where possible
     url_obj, _ = URL.objects.get_or_create(canonical_url=normalized)
 
+# Run all checks independently
     tls = check_tls(normalized)
     sb = check_safe_browsing(normalized)
     heur = check_heuristics(normalized)
@@ -46,7 +49,8 @@ def scan_url(request):
         "safe_browsing": sb.__dict__,
         "heuristics": heur.__dict__,
     }
-
+    
+# Combine signals into a final score and state
     result = compute_score(checks)
 
     scan = Scan.objects.create(

@@ -16,8 +16,10 @@ from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Load local environment variables
 load_dotenv(BASE_DIR / ".env")
 
+# Google Safe Browsing API key read from environment
 GOOGLE_SAFE_BROWSING_API_KEY = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY")
 
 # Quick-start development settings - unsuitable for production
@@ -29,7 +31,10 @@ SECRET_KEY = 'django-insecure-$u+edm9%1^ykp5ac38k%hzs$5!wa_v$s=q&4qdiv7a673625r*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+]
 
 
 # Application definition
@@ -121,3 +126,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATICFILES_DIRS = [
+    BASE_DIR / "scanner" / "static",
+]

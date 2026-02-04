@@ -4,9 +4,10 @@ import ipaddress
 import re 
 from urllib.parse import urlsplit, urlunsplit
 
-
+# Reject control characters and hidden whitespace
 _BAD_CHARS_RE = re.compile(r"[\x00-\x1f\x7f\s]")
 
+# Validate and normalise user input before any checks run
 def normalize_url(raw: str) -> str:
     """Validate and canonicalise a user-supplied URL for scanning."""
 
@@ -20,8 +21,10 @@ def normalize_url(raw: str) -> str:
     if _BAD_CHARS_RE.search(s):
         raise ValueError("URL contains invalid whitespace/control characters")
     
+# Normalise slashes
     s = s.replace("\\","/")
 
+# Default to https if no scheme is provided
     if "://" not in s:
         s = "https://" + s
     
@@ -31,6 +34,7 @@ def normalize_url(raw: str) -> str:
     if scheme not in ("http", "https"):
         raise ValueError("Only http and https URLs are allowed")
     
+# Block URLs with missing or malformed netloc
     if not parts.netloc:
         raise ValueError("URLs with embedded credentials are not allowed")
     
@@ -40,6 +44,7 @@ def normalize_url(raw: str) -> str:
     
     host_lc = host.lower()
 
+# Allow localhost and IPs, otherwise require a valid looking domain
     if host_lc != "localhost":
         if _is_ip(host_lc):
             pass
@@ -55,6 +60,7 @@ def normalize_url(raw: str) -> str:
     
     path = parts.path or "/"
 
+# Fragments are ignored for scanning
     fragment = ""
 
     query = parts.query
@@ -68,13 +74,15 @@ def normalize_url(raw: str) -> str:
     
     return normalized
 
+# Check for literal IP addresses
 def _is_ip(host: str) -> bool:
     try:
         ipaddress.ip_address(host)
         return True
     except ValueError:
         return False
-    
+
+# Basic sanity checks for domain names
 def _looks_like_domain(host: str) -> bool:
     if "." not in host:
         return False

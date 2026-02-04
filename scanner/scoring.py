@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
-
+# Final output used by the API and UI
 @dataclass(frozen=True)
 class ScoreResult:
     score: int
@@ -14,17 +14,17 @@ class ScoreResult:
 def clamp(n: int, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, n))
 
-
+# Escalate risk but never downgrade it
 def max_risk(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
-
+# Confidence can only increase not decrease
 def max_confidence(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
-
+ # Keep score ranges consistent with the final state
 def clamp_score_for_state(score: int, state: str) -> int:
     score = clamp(score)
     if state == "UNSAFE":
@@ -33,7 +33,7 @@ def clamp_score_for_state(score: int, state: str) -> int:
         return clamp(score, 35, 69)
     return clamp(score, 70, 100)
 
-
+# Start optimistic and reduce based on evidence
 def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     score = 100
     risk = "low"
@@ -46,6 +46,7 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     sb_status = sb.get("status")
     if sb_status == "flagged":
+        # Safe Browsing overrides everything else
         threats = sb.get("threats") or sb.get("matches") or []
         text = " ".join(str(t) for t in threats).upper()
 
@@ -71,6 +72,7 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     tls_expired = bool(tls.get("expired"))
     days_to_expiry = tls.get("days_to_expiry")
 
+# TLS only affects the score if Safe Browsing did not already flag it
     if sb_status != "flagged":
         if not tls_ok:
             score -= 30
@@ -94,6 +96,7 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     if isinstance(heur_delta, int):
         score += heur_delta
 
+# Final user state
     heur_suspicious = bool(heur.get("suspicious"))
     if heur_suspicious:
         risk = max_risk(risk, "medium")

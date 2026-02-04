@@ -27,12 +27,14 @@
     const scanBtn = document.getElementById("scanBtn");
     const clearBtn = document.getElementById("clearBtn");
 
+// Stop any HTML injection from user input or API text
     function escapeHtml(s) {
       return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
     }
 
     function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
+// Map backend state into simple language for the user
     function uiForState(stateRaw) {
       const state = String(stateRaw || "").toUpperCase();
 
@@ -50,6 +52,7 @@
       return { s, pct: s + "%" };
     }
 
+ // Convert technical signals into 1 to 2 simple reasons
     function topReasons(data) {
       const reasons = [];
       const raw = data?.reasons || {};
@@ -98,7 +101,8 @@
           : "#b7e1c7";
 
       const reasonsHtml = reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("");
-
+      
+// Only show uncertainty when the state is BE CAREFUL
       const uncertaintyLine = card.showUncertainty
         ? `<p class="mutedline">Not all dangerous links are known immediately, so this check may not catch very new scams.</p>`
         : "";
