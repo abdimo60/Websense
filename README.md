@@ -3,7 +3,7 @@
 WebSense checks whether a link is safe to open.
 
 ## Live Prototype
-https://YOUR-RENDER-URL
+https://websense-1ic6.onrender.com
 
 Paste a link and click **Check link**. No login required.
 
@@ -13,11 +13,6 @@ Paste a link and click **Check link**. No login required.
 
 ## API
 POST /api/scan/
-
-Example:
-{
-  "url": "https://example.com"
-}
 
 ## Code
 https://github.com/abdimo60/Websense
