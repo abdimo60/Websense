@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
+
 # Final output used by the API and UI
 @dataclass(frozen=True)
 class ScoreResult:
@@ -14,17 +15,20 @@ class ScoreResult:
 def clamp(n: int, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, n))
 
+
 # Escalate risk but never downgrade it
 def max_risk(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
+
 
 # Confidence can only increase not decrease
 def max_confidence(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
- # Keep score ranges consistent with the final state
+
+# Keep score ranges consistent with the final state
 def clamp_score_for_state(score: int, state: str) -> int:
     score = clamp(score)
     if state == "UNSAFE":
@@ -32,6 +36,7 @@ def clamp_score_for_state(score: int, state: str) -> int:
     if state == "BE_CAREFUL":
         return clamp(score, 35, 69)
     return clamp(score, 70, 100)
+
 
 # Start optimistic and reduce based on evidence
 def compute_score(checks: Dict[str, Any]) -> ScoreResult:
@@ -42,11 +47,14 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     tls = checks.get("tls") or {}
     sb = checks.get("safe_browsing") or {}
+    op = checks.get("openphish") or {}   # <-- ADD
     heur = checks.get("heuristics") or {}
 
     sb_status = sb.get("status")
+    op_status = op.get("status")         # <-- ADD
+
+    # ---- Hard UNSAFE signals (multi-source) ----
     if sb_status == "flagged":
-        # Safe Browsing overrides everything else
         threats = sb.get("threats") or sb.get("matches") or []
         text = " ".join(str(t) for t in threats).upper()
 
@@ -65,19 +73,31 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
         risk = "high"
         confidence = "high"
-    elif sb_status == "unavailable":
-        confidence = max_confidence(confidence, "medium")
+
+    elif op_status == "listed":
+        # OpenPhish overrides like Safe Browsing does (backup intel source)
+        score = 8
+        reasons["openphish"] = "Listed in OpenPhish feed."
+        risk = "high"
+        confidence = "high"
+
+    else:
+        # Availability affects confidence slightly
+        if sb_status == "unavailable":
+            confidence = max_confidence(confidence, "medium")
+        if op_status == "unavailable":
+            confidence = max_confidence(confidence, "medium")
 
     tls_ok = bool(tls.get("ok"))
     tls_expired = bool(tls.get("expired"))
     days_to_expiry = tls.get("days_to_expiry")
 
-# TLS only affects the score if Safe Browsing did not already flag it
-    if sb_status != "flagged":
+    # TLS only affects the score if no hard UNSAFE source fired
+    hard_unsafe = (sb_status == "flagged") or (op_status == "listed")
+    if not hard_unsafe:
         if not tls_ok:
             score -= 30
             risk = max_risk(risk, "medium")
-            confidence = max_confidence(confidence, "low")
             reasons["tls"] = "TLS check not OK."
 
         if tls_expired:
@@ -89,20 +109,19 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
         if isinstance(days_to_expiry, int) and days_to_expiry < 14 and not tls_expired:
             score -= 10
             risk = max_risk(risk, "medium")
-            confidence = max_confidence(confidence, "low")
             reasons["tls_expiry_soon"] = f"TLS expires soon ({days_to_expiry} days)."
 
     heur_delta = heur.get("score_delta")
-    if isinstance(heur_delta, int):
+    if isinstance(heur_delta, int) and not hard_unsafe:
         score += heur_delta
 
-# Final user state
+    # Final user state
     heur_suspicious = bool(heur.get("suspicious"))
     if heur_suspicious:
         risk = max_risk(risk, "medium")
         reasons["heuristics"] = heur.get("reasons") or ["Heuristic indicators triggered."]
 
-    if sb_status == "flagged":
+    if hard_unsafe:
         state = "UNSAFE"
     else:
         tls_problem = (not tls_ok) or tls_expired or (

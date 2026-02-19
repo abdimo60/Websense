@@ -35,8 +35,11 @@ def normalize_url(raw: str) -> str:
         raise ValueError("Only http and https URLs are allowed")
     
 # Block URLs with missing or malformed netloc
-    if not parts.netloc:
+    if parts.username or parts.password:
         raise ValueError("URLs with embedded credentials are not allowed")
+    
+    if not parts.netloc:
+        raise ValueError("Invalid URL (missing hostname)")
     
     host = parts.hostname
     if not host:

@@ -107,7 +107,7 @@
         ? `<p class="mutedline">Not all dangerous links are known immediately, so this check may not catch very new scams.</p>`
         : "";
 
-      const detailsJson = JSON.stringify(data?.details || {}, null, 2);
+      const detailsJson = JSON.stringify( { checks: data?.checks || {} },null,2);
 
       resultEl.innerHTML = `
         <div class="pill ${card.tone}">${escapeHtml(card.pill)}</div>
