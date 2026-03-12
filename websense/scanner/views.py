@@ -8,7 +8,7 @@ from django.views.decorators.http import require_http_methods
 from .checks.heuristics import check_heuristics
 from .checks.safebrowsing import check_safe_browsing
 from .checks.tls import check_tls
-from .checks.openphish import check_openphish
+from .checks.openphish import check_openphish 
 from .models import URL, Scan
 from .scoring import compute_score
 from .utils import normalize_url
@@ -25,7 +25,6 @@ def _response(
     explanation: str,
     url: str | None = None,
     score: int | None = None,
-    confidence: str | None = None,
     reasons: dict | None = None,
     checks: dict | None = None,
     scan_id: int | None = None,
@@ -37,7 +36,6 @@ def _response(
         "explanation": explanation,
         "url": url,
         "score": score,
-        "confidence": confidence,
         "reasons": reasons or {},
         "checks": checks or {},
         "scan_id": scan_id,
@@ -45,35 +43,6 @@ def _response(
     if error:
         payload["error"] = error
     return JsonResponse(payload, status=status)
-
-
-# Builds a clearer explanation for the user
-def build_explanation(state: str, reasons: dict) -> str:
-    if state == "UNSAFE":
-        if reasons.get("safe_browsing"):
-            return "This link looks unsafe because it appears in a phishing or malware database."
-
-        if reasons.get("openphish"):
-            return "This link looks unsafe because it appears in a phishing database."
-
-        if reasons.get("tls_expired"):
-            return "This link looks unsafe because the site's security certificate has expired."
-
-        return "This looks unsafe based on one or more strong risk signals."
-
-    elif state == "BE_CAREFUL":
-        heur_reasons = reasons.get("heuristics") or []
-
-        if heur_reasons:
-            return "Some warning signs were found in the web address. Proceed carefully."
-
-        if reasons.get("tls") or reasons.get("tls_expiry_soon"):
-            return "This site may not be securely configured. Proceed carefully."
-
-        return "Some risk signals were detected. Proceed carefully."
-
-    else:
-        return "No strong risk signals detected."
 
 
 @csrf_exempt
@@ -182,14 +151,19 @@ def scan_url(request):
     except Exception as e:
         checks["db_write"] = {"ok": False, "error": str(e)[:160]}
 
-    explanation = build_explanation(result.state, result.reasons)
+    # Explanation
+    if result.state == "UNSAFE":
+        explanation = "This looks unsafe based on one or more strong risk signals."
+    elif result.state == "BE_CAREFUL":
+        explanation = "Some risk signals were detected. Proceed carefully."
+    else:
+        explanation = "No strong risk signals detected."
 
     return _response(
         state=result.state,
         explanation=explanation,
         url=normalized,
         score=result.score,
-        confidence=result.confidence,
         reasons=result.reasons,
         checks=checks,
         scan_id=scan_id,

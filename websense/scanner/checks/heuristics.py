@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import List
 from urllib.parse import urlparse
 import ipaddress
-import re
 
 
 # Output from simple URL heuristics
@@ -15,7 +14,6 @@ class HeuristicResult:
     subdomain_depth: int
     ip_host: bool
     punycode_detected: bool
-    numeric_ip_url: bool
 
 
 # Counts how many subdomains exist beyond the main domain
@@ -46,11 +44,6 @@ def _has_punycode(host: str) -> bool:
     return "xn--" in host.lower()
 
 
-# Detects URLs written with a numeric IP address
-def _has_numeric_ip_url(url: str) -> bool:
-    return bool(re.match(r"^https?://\d+\.\d+\.\d+\.\d+", url.strip(), re.IGNORECASE))
-
-
 def check_heuristics(
     url: str,
     url_len_threshold: int = 120,
@@ -63,7 +56,6 @@ def check_heuristics(
     subdomain_depth = _subdomain_depth(host)
     ip_host = _is_ip_host(host)
     punycode_detected = _has_punycode(host)
-    numeric_ip_url = _has_numeric_ip_url(url)
 
     reasons: List[str] = []
     score_delta = 0
@@ -81,10 +73,10 @@ def check_heuristics(
         reasons.append(f"High subdomain depth ({subdomain_depth}).")
         score_delta -= 10
 
-    # Numeric IP links are common in phishing emails
-    if ip_host or numeric_ip_url:
+    # Raw IP hosts are unusual for normal public-facing websites
+    if ip_host:
         suspicious = True
-        reasons.append("The link uses a numeric IP address instead of a normal website name.")
+        reasons.append("Uses an IP address instead of a normal domain name.")
         score_delta -= 15
 
     # Punycode can be used to imitate trusted domains
@@ -101,5 +93,4 @@ def check_heuristics(
         subdomain_depth=subdomain_depth,
         ip_host=ip_host,
         punycode_detected=punycode_detected,
-        numeric_ip_url=numeric_ip_url,
     )
