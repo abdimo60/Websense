@@ -48,7 +48,7 @@ function uiForState(stateRaw, backendConfidence){
     tone: "ok",
     pill: "SAFE",
     headline: "No known signs of phishing.",
-    action: "Still double-check before logging in.",
+    action: "Still double check before logging in.",
     steps: [
       "Only continue if you expected the link.",
       "Use bookmarks for banking.",
@@ -119,7 +119,9 @@ function toggle(el, btn, show, hide){
 function renderResult(data){
   const card = uiForState(data?.state, data?.confidence);
   const reasons = topReasons(data);
-  const reasonsHtml = reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("");
+  const reasonsHtml = reasons.length
+    ? reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")
+    : "<li>No extra details were returned for this result.</li>";
 
   resultEl.className = `card result ${card.tone}`;
 
@@ -133,8 +135,8 @@ function renderResult(data){
 
   <div class="meta">
     <div>Risk: <span class="metaValue">${riskLabel(data?.state)}</span></div>
-    <div>Confidence: <span class="metaValue">${card.confidence}</span></div>
-    <div>Score: <span class="metaValue">${data?.score}/100</span></div>
+    <div>Confidence: <span class="metaValue">${escapeHtml(card.confidence)}</span></div>
+    <div>Score: <span class="metaValue">${Number.isFinite(data?.score) ? data.score : "-"}/100</span></div>
   </div>
 
 </div>
@@ -153,7 +155,7 @@ function renderResult(data){
 </div>
 
 <div class="panel">
-  <button class="linkBtn" id="whyBtn">Why am I seeing this?</button>
+  <button class="linkBtn" id="whyBtn" type="button">Why WebSense flagged this</button>
   <div id="whyWrap" style="display:none">
     <ul>${reasonsHtml}</ul>
   </div>
@@ -163,7 +165,7 @@ function renderResult(data){
   const whyBtn = document.getElementById("whyBtn");
   const whyWrap = document.getElementById("whyWrap");
 
-  whyBtn.onclick = () => toggle(whyWrap, whyBtn, "Why am I seeing this?", "Hide explanation");
+  whyBtn.onclick = () => toggle(whyWrap, whyBtn, "Why WebSense flagged this", "Hide explanation");
 
   resultEl.style.display = "block";
 }
@@ -176,7 +178,7 @@ function renderChecking(){
   <span>CHECKING</span>
 </div>
 
-<h2 class="headline">Checking link…</h2>
+<h2 class="headline">Checking link...</h2>
 
 <div class="loadingWrap">
   <div class="spinner"></div>
@@ -191,45 +193,100 @@ function renderChecking(){
 function renderError(msg){
   resultEl.className = "card result no";
   resultEl.innerHTML = `
-<h2 class="headline">${msg}</h2>
+<div class="statusPill no">
+  <span class="dot"></span>
+  <span>ERROR</span>
+</div>
+
+<h2 class="headline">${escapeHtml(msg)}</h2>
 <p class="action">Try again with a full link like https://example.com</p>
 `;
   resultEl.style.display = "block";
 }
 
+function isValidHttpUrl(value){
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function readErrorResponse(res){
+  const contentType = res.headers.get("content-type") || "";
+
+  if(contentType.includes("application/json")){
+    const data = await res.json();
+    return (
+      data?.error ||
+      data?.message ||
+      data?.detail ||
+      data?.explanation ||
+      `The server returned ${res.status}.`
+    );
+  }
+
+  const text = await res.text();
+  return text?.trim() || `The server returned ${res.status}.`;
+}
+
 async function handleScan(urlOverride = null){
-  const url = urlOverride || urlInput.value.trim();
+  const rawUrl = urlOverride ?? urlInput.value;
+  const url = String(rawUrl || "").trim();
 
   if(!url){
+    renderError("Please enter a website link.");
     urlInput.focus();
     return;
   }
 
-  if (!urlOverride) {
-    urlInput.value = url;
+  if(!isValidHttpUrl(url)){
+    renderError("Enter a full website link starting with http:// or https://");
+    urlInput.focus();
+    return;
   }
 
+  urlInput.value = url;
   scanBtn.disabled = true;
   renderChecking();
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     const res = await fetch("/api/scan/", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url }),
+      signal: controller.signal
     });
 
-    const data = await res.json();
+    clearTimeout(timeoutId);
 
     if(!res.ok){
-      renderError("Scan failed.");
+      const message = await readErrorResponse(res);
+      renderError(message);
       return;
     }
 
+    const contentType = res.headers.get("content-type") || "";
+
+    if(!contentType.includes("application/json")){
+      renderError("The server returned an unexpected response.");
+      return;
+    }
+
+    const data = await res.json();
     renderResult(data);
 
   } catch(err) {
-    renderError("Request failed.");
+    if(err.name === "AbortError"){
+      renderError("The scan took too long. Please try again.");
+      return;
+    }
+
+    renderError("Could not connect to the scanner. Please try again.");
   } finally {
     scanBtn.disabled = false;
   }
@@ -238,6 +295,8 @@ async function handleScan(urlOverride = null){
 function handleClear(){
   urlInput.value = "";
   resultEl.style.display = "none";
+  resultEl.innerHTML = "";
+  resultEl.className = "card";
   scanBtn.disabled = false;
 
   const cleanUrl = window.location.pathname;
