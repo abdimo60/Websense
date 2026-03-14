@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebSense</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark">W</div>
+      <div class="brand-text">
+        <h1>WebSense</h1>
+        <p>Check a link before you click.</p>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card input-card">
+        <label class="section-label">Current website</label>
+        <div class="url-box">
+          <span id="current-url">Loading...</span>
+        </div>
+
+        <p class="status-line">
+          Scanning the page you are currently visiting.
+        </p>
+
+        <div class="button-row">
+          <button id="scan-btn">Check link</button>
+          <button id="open-site-btn" class="secondary">More details</button>
+        </div>
+
+        <p class="tip-text">
+          Tip: If this came from a message, be extra careful with login or payment links.
+        </p>
+      </section>
+
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <div>
+          <p class="loading-title">Checking this website...</p>
+          <p class="loading-subtitle">This can take a few seconds.</p>
+        </div>
+      </div>
+
+      <section id="result" class="result hidden">
+        <div class="result-head">
+          <div id="state-badge" class="badge">-</div>
+          <div class="result-meta">
+            <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
+          </div>
+        </div>
+
+        <h2 id="result-title">Result</h2>
+
+        <p class="result-label"><strong>Why am I seeing this?</strong></p>
+        <p id="explanation" class="explanation">-</p>
+      </section>
+
+      <div id="error" class="error hidden"></div>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

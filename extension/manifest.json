@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "WebSense",
+  "version": "1.0",
+  "description": "Checks the current website for phishing risk using WebSense.",
+  "permissions": ["activeTab", "tabs"],
+  "host_permissions": [
+    "https://websense-1ic6.onrender.com/*"
+  ],
+  "action": {
+    "default_title": "WebSense",
+    "default_popup": "popup.html"
+  }
+}
