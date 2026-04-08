@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
-# Final output returned to the API / UI
+
+# Final output returned to API/UI
 @dataclass(frozen=True)
 class ScoreResult:
     score: int
@@ -11,24 +12,24 @@ class ScoreResult:
     reasons: Dict[str, Any]
 
 
-# Ensures score stays within valid bounds
+# Keep score between 0–100
 def clamp(n: int, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, n))
 
 
-# Escalates risk but never reduces it
+# Increase risk but never reduce it
 def max_risk(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
 
-# Confidence should only increase, never decrease
+# Same idea for confidence
 def max_confidence(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
 
-# Keeps the score inside the correct band for the final state
+# Make sure score matches the final state
 def clamp_score_for_state(score: int, state: str) -> int:
     score = clamp(score)
 
@@ -41,30 +42,21 @@ def clamp_score_for_state(score: int, state: str) -> int:
     return clamp(score, 61, 100)
 
 
-# Sets confidence based on the final result
+# Set confidence level based on result strength
 def confidence_from_result(score: int, state: str, hard_unsafe: bool) -> str:
-    # Database hits should always be high confidence
     if hard_unsafe:
         return "high"
 
-    # Very strong safe result
     if state == "SAFE":
-        if score >= 85:
-            return "high"
-        return "medium"
+        return "high" if score >= 85 else "medium"
 
-    # Suspicious result
     if state == "BE_CAREFUL":
-        if score <= 40:
-            return "high"
-        return "medium"
+        return "high" if score <= 40 else "medium"
 
-    # Unsafe result without a database hit
     return "high"
 
 
 # Main scoring logic
-# Start optimistic and reduce score based on signals
 def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     score = 100
@@ -80,48 +72,18 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     sb_status = sb.get("status")
     op_status = op.get("status")
 
-    # Hard UNSAFE signals
-    # These override normal scoring
+    # Hard overrides (high confidence)
     if sb_status == "flagged":
-
-        threats = sb.get("threats") or sb.get("matches") or []
-        text = " ".join(str(t) for t in threats).upper()
-
-        # Different Safe Browsing categories
-        if "MALWARE" in text:
-            score = 5
-            reasons["safe_browsing"] = "This link appears in Google Safe Browsing as malware."
-
-        elif "SOCIAL_ENGINEERING" in text or "PHISH" in text:
-            score = 8
-            reasons["safe_browsing"] = "This link appears in Google Safe Browsing as phishing."
-
-        elif "UNWANTED" in text:
-            score = 12
-            reasons["safe_browsing"] = "This link appears in Google Safe Browsing as unwanted software."
-
-        else:
-            score = 10
-            reasons["safe_browsing"] = "This link appears in Google Safe Browsing."
-
+        score = 8
+        reasons["safe_browsing"] = "Flagged by Google Safe Browsing."
         risk = "high"
         confidence = "high"
 
     elif op_status == "listed":
-
         score = 8
-        reasons["openphish"] = "This link appears in the OpenPhish phishing feed."
-
+        reasons["openphish"] = "Found in OpenPhish feed."
         risk = "high"
         confidence = "high"
-
-    else:
-        # If APIs are unavailable reduce confidence slightly
-        if sb_status == "unavailable":
-            confidence = max_confidence(confidence, "medium")
-
-        if op_status == "unavailable":
-            confidence = max_confidence(confidence, "medium")
 
     tls_ok = bool(tls.get("ok"))
     tls_expired = bool(tls.get("expired"))
@@ -129,58 +91,59 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
 
     hard_unsafe = (sb_status == "flagged") or (op_status == "listed")
 
-    # TLS related checks
-    # Only apply if not already UNSAFE
+    # TLS penalties
     if not hard_unsafe:
 
         if not tls_ok:
-            score -= 30
+            score -= 15
             risk = max_risk(risk, "medium")
-            reasons["tls"] = "This site does not appear securely configured."
+            reasons["tls"] = "Not securely configured."
 
-        # Expired certificate is a strong signal
         if tls_expired:
-            score = min(score, 20)
+            score -= 35
             risk = "high"
-            confidence = max_confidence(confidence, "medium")
-            reasons["tls_expired"] = "This site's security certificate has expired."
+            reasons["tls_expired"] = "Certificate has expired."
 
-        # Certificate about to expire
         if isinstance(days_to_expiry, int) and days_to_expiry < 14 and not tls_expired:
             score -= 10
-            risk = max_risk(risk, "medium")
-            reasons["tls_expiry_soon"] = f"This site's security certificate expires soon ({days_to_expiry} days)."
+            reasons["tls_expiry_soon"] = "Certificate expires soon."
 
-    # Heuristic scoring adjustments
+    # Heuristics
     heur_delta = heur.get("score_delta")
+    heur_suspicious = bool(heur.get("suspicious"))
+    heur_reasons = heur.get("reasons") or []
+    heur_triggered_count = int(heur.get("triggered_count") or 0)
 
     if isinstance(heur_delta, int) and not hard_unsafe:
         score += heur_delta
-
-    heur_suspicious = bool(heur.get("suspicious"))
-    heur_reasons = heur.get("reasons") or []
 
     if heur_suspicious:
         risk = max_risk(risk, "medium")
         reasons["heuristics"] = heur_reasons
 
-    # Final classification state
+        if heur_triggered_count >= 2:
+            risk = max_risk(risk, "high")
+
+    # Final classification
     if hard_unsafe:
         state = "UNSAFE"
-
     else:
         if score <= 20:
             state = "UNSAFE"
-
         elif score <= 60:
             state = "BE_CAREFUL"
-
         else:
             state = "SAFE"
 
-    score = clamp_score_for_state(int(score), state)
+        # Combine weak signals
+        if state == "SAFE" and (not tls_ok) and heur_suspicious:
+            state = "BE_CAREFUL"
 
-    # Final confidence should match the final score/result
+        # Strong heuristic combo
+        if heur_triggered_count >= 3 and state == "BE_CAREFUL":
+            state = "UNSAFE"
+
+    score = clamp_score_for_state(int(score), state)
     confidence = confidence_from_result(score, state, hard_unsafe)
 
     return ScoreResult(

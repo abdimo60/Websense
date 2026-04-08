@@ -1,0 +1,18 @@
+url,expected,label_source,notes
+https://www.apple.com,SAFE,manual,official site
+https://www.reuters.com,SAFE,manual,news site
+https://www.stackoverflow.com,SAFE,manual,developer forum
+https://www.gov.uk/help,SAFE,manual,government service
+https://www.bbc.com,SAFE,manual,news site
+https://www.nike.com,SAFE,manual,ecommerce brand
+https://www.openai.com,SAFE,manual,technology company
+https://www.cloudflare.com,SAFE,manual,web infrastructure company
+
+http://amazon.verify-account-secure-login.co,PHISHING,heuristic,brand spoof
+http://microsoft.account-security-update-login.com,PHISHING,heuristic,keyword + spoof
+http://paypal.secure-login-confirmation-update.co,PHISHING,heuristic,keyword heavy
+http://banking-login.verify-user-account-secure.com,PHISHING,heuristic,financial phishing style
+http://apple.id-login-secure-update-account.com,PHISHING,heuristic,brand impersonation
+http://google.verify-account-security-update-login.com,PHISHING,heuristic,brand + keyword spoof
+http://secure-paypal-account-update-login-confirmation.com,PHISHING,heuristic,multiple keyword spoof
+http://login-secure-account-verification-update-bank.com,PHISHING,heuristic,heavy keyword phishing pattern

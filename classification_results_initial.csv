@@ -1,0 +1,21 @@
+ID,URL Tested,Expected Result,WebSense Result,Score,Response Time (ms),HTTP Status,Reason Flags,Correct?,Evaluation,Label Source,Notes
+1,https://www.google.com,SAFE,SAFE,100,605.24,200,,YES,TRUE_NEGATIVE,manual,well-known site
+2,https://www.bbc.co.uk,SAFE,SAFE,100,607.11,200,,YES,TRUE_NEGATIVE,manual,news site
+3,https://www.amazon.co.uk,SAFE,SAFE,100,755.83,200,,YES,TRUE_NEGATIVE,manual,ecommerce
+4,https://www.microsoft.com,SAFE,SAFE,100,639.48,200,,YES,TRUE_NEGATIVE,manual,official site
+5,https://www.github.com,SAFE,SAFE,100,648.34,200,,YES,TRUE_NEGATIVE,manual,developer platform
+6,https://www.nhs.uk,SAFE,SAFE,100,886.85,200,,YES,TRUE_NEGATIVE,manual,UK health
+7,https://www.gov.uk,SAFE,SAFE,100,703.62,200,,YES,TRUE_NEGATIVE,manual,UK government
+8,https://www.wikipedia.org,SAFE,SAFE,100,658.82,200,,YES,TRUE_NEGATIVE,manual,reference
+9,https://www.youtube.com,SAFE,SAFE,100,547.65,200,,YES,TRUE_NEGATIVE,manual,video platform
+10,https://www.linkedin.com,SAFE,SAFE,100,798.30,200,,YES,TRUE_NEGATIVE,manual,social network
+11,http://testsafebrowsing.appspot.com/s/phishing.html,PHISHING,UNSAFE,8,573.73,200,safe_browsing: This link appears in Google Safe Browsing as phishing.,YES,TRUE_POSITIVE,safebrowsing,google test phishing
+12,http://testsafebrowsing.appspot.com/s/malware.html,PHISHING,UNSAFE,5,591.32,200,safe_browsing: This link appears in Google Safe Browsing as malware.,YES,TRUE_POSITIVE,safebrowsing,google test malware
+13,http://testsafebrowsing.appspot.com/s/unwanted.html,PHISHING,UNSAFE,12,559.51,200,safe_browsing: This link appears in Google Safe Browsing as unwanted software.,YES,TRUE_POSITIVE,safebrowsing,google unwanted software
+14,http://testsafebrowsing.appspot.com/s/phishing.html?hl=en,PHISHING,UNSAFE,8,565.28,200,safe_browsing: This link appears in Google Safe Browsing as phishing.,YES,TRUE_POSITIVE,safebrowsing,variant phishing test
+15,http://192.168.1.1/login,PHISHING,BE_CAREFUL,55,4586.71,200,tls: This site does not appear securely configured. | heuristics: The link uses a numeric IP address instead of a normal website name.,YES,TRUE_POSITIVE,heuristic,IP address used
+16,http://paypal.com.verify-login.security-update.co,PHISHING,SAFE,70,538.20,200,tls: This site does not appear securely configured.,NO,FALSE_NEGATIVE,heuristic,subdomain spoof
+17,http://xn--pple-43d.com,PHISHING,BE_CAREFUL,55,663.98,200,"tls: This site does not appear securely configured. | heuristics: Domain uses punycode, which can hide lookalike characters.",YES,TRUE_POSITIVE,heuristic,punycode lookalike
+18,http://secure-login-account-update-paypal.com/login/verify,PHISHING,SAFE,70,527.97,200,tls: This site does not appear securely configured.,NO,FALSE_NEGATIVE,heuristic,long url
+19,http://google.com.user.security.verify-login.co,PHISHING,BE_CAREFUL,60,576.66,200,tls: This site does not appear securely configured. | heuristics: High subdomain depth (4).,YES,TRUE_POSITIVE,heuristic,domain spoof
+20,http://very-long-url-login-secure-update-account-verification-example.com/login/account/update/security,PHISHING,SAFE,70,499.83,200,tls: This site does not appear securely configured.,NO,FALSE_NEGATIVE,heuristic,very long url

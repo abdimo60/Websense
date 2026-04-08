@@ -1,0 +1,17 @@
+ID,URL Tested,Expected Result,WebSense Result,Score,Response Time (ms),HTTP Status,Reason Flags,Correct?,Evaluation,Label Source,Notes
+1,https://www.apple.com,SAFE,SAFE,100,704.25,200,,YES,TRUE_NEGATIVE,manual,official site
+2,https://www.reuters.com,SAFE,SAFE,100,598.44,200,,YES,TRUE_NEGATIVE,manual,news site
+3,https://www.stackoverflow.com,SAFE,SAFE,100,724.04,200,,YES,TRUE_NEGATIVE,manual,developer forum
+4,https://www.gov.uk/help,SAFE,SAFE,100,630.25,200,,YES,TRUE_NEGATIVE,manual,government service
+5,https://www.bbc.com,SAFE,SAFE,100,635.36,200,,YES,TRUE_NEGATIVE,manual,news site
+6,https://www.nike.com,SAFE,SAFE,100,612.86,200,,YES,TRUE_NEGATIVE,manual,ecommerce brand
+7,https://www.openai.com,SAFE,SAFE,100,696.19,200,,YES,TRUE_NEGATIVE,manual,technology company
+8,https://www.cloudflare.com,SAFE,SAFE,100,570.46,200,,YES,TRUE_NEGATIVE,manual,web infrastructure company
+9,http://amazon.verify-account-secure-login.co,PHISHING,BE_CAREFUL,60,522.56,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,brand spoof
+10,http://microsoft.account-security-update-login.com,PHISHING,BE_CAREFUL,60,528.96,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,keyword + spoof
+11,http://paypal.secure-login-confirmation-update.co,PHISHING,BE_CAREFUL,60,523.77,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,keyword heavy
+12,http://banking-login.verify-user-account-secure.com,PHISHING,BE_CAREFUL,60,540.58,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,financial phishing style
+13,http://apple.id-login-secure-update-account.com,PHISHING,BE_CAREFUL,60,498.79,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,brand impersonation
+14,http://google.verify-account-security-update-login.com,PHISHING,BE_CAREFUL,60,538.10,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,brand + keyword spoof
+15,http://secure-paypal-account-update-login-confirmation.com,PHISHING,BE_CAREFUL,60,614.70,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,multiple keyword spoof
+16,http://login-secure-account-verification-update-bank.com,PHISHING,BE_CAREFUL,60,552.06,200,tls: Not securely configured. | heuristics: Contains multiple suspicious login-related keywords.,YES,TRUE_POSITIVE,heuristic,heavy keyword phishing pattern
