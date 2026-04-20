@@ -20,3 +20,6 @@ Thumbs.db
 
 # Collected static files
 staticfiles/
+
+# Testing outputs
+evidence/testing/*.csv

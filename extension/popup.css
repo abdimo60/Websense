@@ -2,6 +2,7 @@
   box-sizing: border-box;
 }
 
+/* Theme colours + result states */
 :root {
   --navy: #07142b;
   --navy-soft: #0d1d3a;
@@ -82,6 +83,7 @@ body {
   padding: 16px;
 }
 
+/* Main card */
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -114,6 +116,7 @@ body {
   margin-bottom: 12px;
 }
 
+/* Buttons */
 .button-row {
   display: flex;
   gap: 10px;
@@ -162,6 +165,7 @@ body {
   line-height: 1.4;
 }
 
+/* Loading state */
 .loading {
   margin-top: 14px;
   display: flex;
@@ -195,6 +199,7 @@ body {
   color: var(--muted);
 }
 
+/* Result states */
 .result {
   margin-top: 14px;
   border-radius: 18px;
@@ -274,6 +279,7 @@ body {
   color: #1e293b;
 }
 
+/* Error + utility */
 .error {
   margin-top: 14px;
   padding: 12px 14px;

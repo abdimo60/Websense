@@ -6,21 +6,38 @@ from datetime import datetime
 import requests
 
 API_URL = "http://127.0.0.1:8000/api/scan/"
-# API_URL = "https://websense-1ic6.onrender.com/api/scan/"
 
 INPUT_CSV = sys.argv[1] if len(sys.argv) > 1 else "classification_dataset.csv"
-OUTPUT_CSV = f"classification_results_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.csv"
+
+# Save results inside evidence/testing folder
+OUTPUT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+OUTPUT_CSV = OUTPUT_DIR / f"classification_results_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.csv"
+
 TIMEOUT_SECONDS = 8
 REQUEST_DELAY_SECONDS = 0.2
 
+FIELDNAMES = [
+    "ID",
+    "URL Tested",
+    "Expected Result",
+    "WebSense Result",
+    "Response Time (ms)",
+    "HTTP Status",
+    "Correct?",
+    "Evaluation",
+    "Notes",
+]
 
+# Normalise expected labels
 def normalise_expected(value: str) -> str:
     value = (value or "").strip().upper()
     if value in {"SAFE", "PHISHING"}:
         return value
     return "UNKNOWN"
 
-
+# Compare expected vs predicted result
 def classify_evaluation(expected: str, predicted: str) -> str:
     predicted = (predicted or "").strip().upper()
 
@@ -40,29 +57,12 @@ def classify_evaluation(expected: str, predicted: str) -> str:
 
     return "UNKNOWN"
 
-
+# Check if prediction is correct
 def is_prediction_correct(expected: str, predicted: str) -> str:
     evaluation = classify_evaluation(expected, predicted)
     return "YES" if evaluation in {"TRUE_POSITIVE", "TRUE_NEGATIVE"} else "NO"
 
-
-def flatten_reasons(reasons) -> str:
-    if not reasons:
-        return ""
-
-    if isinstance(reasons, dict):
-        parts = []
-        for key, value in reasons.items():
-            if isinstance(value, list):
-                joined = "; ".join(str(v) for v in value)
-                parts.append(f"{key}: {joined}")
-            else:
-                parts.append(f"{key}: {value}")
-        return " | ".join(parts)
-
-    return str(reasons)
-
-
+# Send request to API and measure response time
 def scan_url(url: str) -> tuple[dict, float, int]:
     start = time.perf_counter()
 
@@ -79,7 +79,7 @@ def scan_url(url: str) -> tuple[dict, float, int]:
     response.raise_for_status()
     return response.json(), elapsed_ms, status_code
 
-
+# Calculate accuracy and performance metrics
 def calculate_metrics(output_rows: list[dict]) -> dict:
     total = len(output_rows)
     correct = sum(1 for row in output_rows if row["Correct?"] == "YES")
@@ -138,7 +138,6 @@ def calculate_metrics(output_rows: list[dict]) -> dict:
 
 def main() -> None:
     input_path = Path(INPUT_CSV)
-    output_path = Path(OUTPUT_CSV)
 
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {INPUT_CSV}")
@@ -157,8 +156,6 @@ def main() -> None:
         expected = normalise_expected(
             row.get("expected") or row.get("Expected Result") or row.get("Expected") or ""
         )
-        label_source = (row.get("label_source") or "").strip()
-        notes = (row.get("notes") or "").strip()
 
         print(f"[{idx}/{total_rows}] Testing: {url or '(missing URL)'}")
 
@@ -168,13 +165,10 @@ def main() -> None:
                 "URL Tested": "",
                 "Expected Result": expected,
                 "WebSense Result": "ERROR",
-                "Score": "",
                 "Response Time (ms)": "",
                 "HTTP Status": "",
-                "Reason Flags": "",
                 "Correct?": "NO",
                 "Evaluation": "UNKNOWN",
-                "Label Source": label_source,
                 "Notes": "Missing URL",
             })
             continue
@@ -182,26 +176,17 @@ def main() -> None:
         try:
             result, elapsed_ms, status_code = scan_url(url)
             state = str(result.get("state", "")).upper()
-            score = result.get("score", "")
-            reasons = flatten_reasons(result.get("reasons"))
-            evaluation = classify_evaluation(expected, state)
-            correct = is_prediction_correct(expected, state)
-
-            combined_notes = notes
 
             output_rows.append({
                 "ID": idx,
                 "URL Tested": url,
                 "Expected Result": expected,
                 "WebSense Result": state,
-                "Score": score,
                 "Response Time (ms)": f"{elapsed_ms:.2f}",
                 "HTTP Status": status_code,
-                "Reason Flags": reasons,
-                "Correct?": correct,
-                "Evaluation": evaluation,
-                "Label Source": label_source,
-                "Notes": combined_notes,
+                "Correct?": is_prediction_correct(expected, state),
+                "Evaluation": classify_evaluation(expected, state),
+                "Notes": "",
             })
 
         except requests.Timeout:
@@ -210,13 +195,10 @@ def main() -> None:
                 "URL Tested": url,
                 "Expected Result": expected,
                 "WebSense Result": "TIMEOUT",
-                "Score": "",
                 "Response Time (ms)": "",
                 "HTTP Status": "",
-                "Reason Flags": "",
                 "Correct?": "NO",
                 "Evaluation": "UNKNOWN",
-                "Label Source": label_source,
                 "Notes": "Request timed out",
             })
 
@@ -226,37 +208,22 @@ def main() -> None:
                 "URL Tested": url,
                 "Expected Result": expected,
                 "WebSense Result": "ERROR",
-                "Score": "",
                 "Response Time (ms)": "",
                 "HTTP Status": "",
-                "Reason Flags": "",
                 "Correct?": "NO",
                 "Evaluation": "UNKNOWN",
-                "Label Source": label_source,
                 "Notes": str(e),
             })
 
         time.sleep(REQUEST_DELAY_SECONDS)
 
-    with output_path.open("w", newline="", encoding="utf-8") as outfile:
-        fieldnames = [
-            "ID",
-            "URL Tested",
-            "Expected Result",
-            "WebSense Result",
-            "Score",
-            "Response Time (ms)",
-            "HTTP Status",
-            "Reason Flags",
-            "Correct?",
-            "Evaluation",
-            "Label Source",
-            "Notes",
-        ]
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+    # Save results in correct folder
+    with OUTPUT_CSV.open("w", newline="", encoding="utf-8") as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=FIELDNAMES)
         writer.writeheader()
         writer.writerows(output_rows)
 
+    # Calculate and print metrics
     metrics = calculate_metrics(output_rows)
 
     print("\nDone.")

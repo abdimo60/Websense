@@ -1,26 +1,46 @@
 {% load static %}
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>WebSense</title>
+
+  <!-- Main CSS file -->
   <link rel="stylesheet" href="{% static 'scanner/styles.css' %}">
 </head>
+
 <body>
+
+  <!-- Header / Branding -->
   <header class="siteHeader">
     <div class="brand">
+
+      <!-- Simple logo box -->
       <div class="logo" aria-hidden="true">W</div>
+
       <div>
         <h1 class="title">WebSense</h1>
-        <p class="subtitle">Check a link before you click. Clear advice, not tech jargon.</p>
+
+        <!-- Clear value proposition -->
+        <p class="subtitle">
+          Check a link before you click. Clear advice, not tech jargon.
+        </p>
       </div>
     </div>
   </header>
 
+  <!-- Main content -->
   <main class="container">
+
+    <!-- Input card -->
     <section class="card card--input" aria-label="Link checker">
+
+      <!-- Input label -->
       <label for="url" class="label">Website link</label>
+
+      <!-- URL input -->
       <input
         id="url"
         class="input"
@@ -30,23 +50,38 @@
         autocomplete="off"
       />
 
+      <!-- Buttons -->
       <div class="row">
-        <button id="scanBtn" class="btn btn--primary" type="button">Check link</button>
-        <button id="clearBtn" class="btn btn--ghost" type="button">Clear</button>
+        <button id="scanBtn" class="btn btn--primary" type="button">
+          Check link
+        </button>
+
+        <button id="clearBtn" class="btn btn--ghost" type="button">
+          Clear
+        </button>
       </div>
 
-      <p class="help">
-        Tip: If this came from a message, be extra careful with login or payment links.
+      <!-- Extension prompt -->
+      <p class="noteText">
+        Using Chrome? Use the WebSense extension to check the page you are already on.
       </p>
+
     </section>
 
-    <section id="result" class="card" style="display:none;" aria-live="polite"></section>
+    <!-- Result card -->
+    <section id="result" class="card" hidden aria-live="polite"></section>
 
+    <!-- Footer -->
     <footer class="footer">
-      <p class="footerText">WebSense gives guidance. You’re still in control of the decision.</p>
+      <p class="footerText">
+        WebSense gives guidance. You’re still in control of the decision.
+      </p>
     </footer>
+
   </main>
 
+  <!-- Main JS file -->
   <script src="{% static 'scanner/app.js' %}"></script>
+
 </body>
 </html>

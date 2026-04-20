@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 
-# Final output returned to API/UI
+# Final score data returned to the API and UI
 @dataclass(frozen=True)
 class ScoreResult:
     score: int
@@ -17,19 +17,19 @@ def clamp(n: int, lo: int = 0, hi: int = 100) -> int:
     return max(lo, min(hi, n))
 
 
-# Increase risk but never reduce it
+# Raise risk only if the new level is higher
 def max_risk(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
 
-# Same idea for confidence
+# Raise confidence only if the new level is higher
 def max_confidence(current: str, new: str) -> str:
     order = {"low": 1, "medium": 2, "high": 3}
     return new if order.get(new, 0) > order.get(current, 0) else current
 
 
-# Make sure score matches the final state
+# Force the score to stay inside the range for the final state
 def clamp_score_for_state(score: int, state: str) -> int:
     score = clamp(score)
 
@@ -42,7 +42,7 @@ def clamp_score_for_state(score: int, state: str) -> int:
     return clamp(score, 61, 100)
 
 
-# Set confidence level based on result strength
+# Set confidence from the final result and hard override checks
 def confidence_from_result(score: int, state: str, hard_unsafe: bool) -> str:
     if hard_unsafe:
         return "high"
@@ -56,9 +56,8 @@ def confidence_from_result(score: int, state: str, hard_unsafe: bool) -> str:
     return "high"
 
 
-# Main scoring logic
+# Main scoring function that combines all scan checks
 def compute_score(checks: Dict[str, Any]) -> ScoreResult:
-
     score = 100
     risk = "low"
     confidence = "low"
@@ -72,7 +71,7 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     sb_status = sb.get("status")
     op_status = op.get("status")
 
-    # Hard overrides (high confidence)
+# Trusted blacklist hits immediately force an unsafe result
     if sb_status == "flagged":
         score = 8
         reasons["safe_browsing"] = "Flagged by Google Safe Browsing."
@@ -89,10 +88,21 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
     tls_expired = bool(tls.get("expired"))
     days_to_expiry = tls.get("days_to_expiry")
 
+# Detect whether the URL is using HTTPS
+    scheme = str(tls.get("scheme") or "").lower()
+    if scheme:
+        uses_https = scheme == "https"
+    else:
+        uses_https = bool(tls_ok)
+
     hard_unsafe = (sb_status == "flagged") or (op_status == "listed")
 
-    # TLS penalties
+# Apply TLS and transport penalties if no hard override was triggered
     if not hard_unsafe:
+        if not uses_https:
+            score -= 20
+            risk = max_risk(risk, "medium")
+            reasons["http_only"] = "This website does not use HTTPS encryption."
 
         if not tls_ok:
             score -= 15
@@ -108,12 +118,18 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
             score -= 10
             reasons["tls_expiry_soon"] = "Certificate expires soon."
 
-    # Heuristics
+ # Extract heuristic results
     heur_delta = heur.get("score_delta")
     heur_suspicious = bool(heur.get("suspicious"))
     heur_reasons = heur.get("reasons") or []
     heur_triggered_count = int(heur.get("triggered_count") or 0)
 
+    brand_spoof_detected = bool(heur.get("brand_spoof_detected"))
+    suspicious_keywords_detected = bool(heur.get("suspicious_keywords_detected"))
+    numeric_ip_url = bool(heur.get("numeric_ip_url"))
+    punycode_detected = bool(heur.get("punycode_detected"))
+
+ # Apply heuristic score adjustment
     if isinstance(heur_delta, int) and not hard_unsafe:
         score += heur_delta
 
@@ -124,7 +140,21 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
         if heur_triggered_count >= 2:
             risk = max_risk(risk, "high")
 
-    # Final classification
+# Extra penalties for stronger suspicious combinations
+    if not hard_unsafe:
+        if brand_spoof_detected and suspicious_keywords_detected:
+            score -= 10
+            risk = max_risk(risk, "high")
+
+        if numeric_ip_url and suspicious_keywords_detected:
+            score -= 10
+            risk = max_risk(risk, "high")
+
+        if punycode_detected and suspicious_keywords_detected:
+            score -= 10
+            risk = max_risk(risk, "high")
+
+# Convert the final score into a user facing state
     if hard_unsafe:
         state = "UNSAFE"
     else:
@@ -135,11 +165,12 @@ def compute_score(checks: Dict[str, Any]) -> ScoreResult:
         else:
             state = "SAFE"
 
-        # Combine weak signals
+        if state == "SAFE" and not uses_https:
+            state = "BE_CAREFUL"
+
         if state == "SAFE" and (not tls_ok) and heur_suspicious:
             state = "BE_CAREFUL"
 
-        # Strong heuristic combo
         if heur_triggered_count >= 3 and state == "BE_CAREFUL":
             state = "UNSAFE"
 

@@ -1,7 +1,9 @@
+// Backend API endpoints
 const API_BASE = "https://websense-1ic6.onrender.com";
 const API_SCAN_URL = `${API_BASE}/api/scan/`;
 const WEBAPP_URL = `${API_BASE}/`;
 
+// UI elements
 const currentUrlEl = document.getElementById("current-url");
 const scanBtn = document.getElementById("scan-btn");
 const loadingEl = document.getElementById("loading");
@@ -15,16 +17,19 @@ const resultTitleEl = document.getElementById("result-title");
 
 let currentTabUrl = "";
 
+// Show error message in UI
 function showError(message) {
   errorEl.textContent = message;
   errorEl.classList.remove("hidden");
 }
 
+// Hide error message
 function hideError() {
   errorEl.textContent = "";
   errorEl.classList.add("hidden");
 }
 
+// Toggle loading state
 function showLoading() {
   loadingEl.classList.remove("hidden");
 }
@@ -33,6 +38,7 @@ function hideLoading() {
   loadingEl.classList.add("hidden");
 }
 
+// Reset result UI
 function hideResult() {
   resultEl.classList.add("hidden");
   resultEl.classList.remove("safe", "careful", "unsafe");
@@ -43,13 +49,15 @@ function hideResult() {
   resultTitleEl.textContent = "Result";
 }
 
+// Map state to user-friendly title
 function getResultTitle(state) {
   if (state === "SAFE") return "No known signs of phishing.";
-  if (state === "BE CAREFUL") return "Some warning signs were found.";
+  if (state === "BE_CAREFUL") return "Some warning signs were found.";
   if (state === "UNSAFE") return "This website looks unsafe.";
   return "Result";
 }
 
+// Display scan result in UI
 function showResult(data) {
   const state = (data.state || "UNKNOWN").toUpperCase();
   const confidence = data.confidence || "Unknown";
@@ -59,10 +67,11 @@ function showResult(data) {
   stateBadgeEl.className = "badge";
   resultEl.classList.remove("safe", "careful", "unsafe");
 
+// Apply styling based on result state
   if (state === "SAFE") {
     stateBadgeEl.classList.add("safe");
     resultEl.classList.add("safe");
-  } else if (state === "BE CAREFUL") {
+  } else if (state === "BE_CAREFUL") {
     stateBadgeEl.classList.add("careful");
     resultEl.classList.add("careful");
   } else if (state === "UNSAFE") {
@@ -76,10 +85,12 @@ function showResult(data) {
   resultEl.classList.remove("hidden");
 }
 
+// Only allow normal web URLs
 function isScannableUrl(url) {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
+// Get current browser tab URL
 async function getCurrentTabUrl() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -96,6 +107,8 @@ async function getCurrentTabUrl() {
   return tab.url;
 }
 
+// Send URL to backend for scanning
+// Uses async/await to handle network requests cleanly without blocking the UI
 async function scanUrl(url) {
   const response = await fetch(API_SCAN_URL, {
     method: "POST",
@@ -113,6 +126,8 @@ async function scanUrl(url) {
   return response.json();
 }
 
+// Run full scan flow
+// API-based design keeps detection logic in the backend, making the extension lightweight
 async function runScan() {
   hideError();
   hideResult();
@@ -133,6 +148,7 @@ async function runScan() {
   }
 }
 
+// Initialise popup on load
 async function initialisePopup() {
   hideError();
   hideResult();
@@ -151,6 +167,7 @@ async function initialisePopup() {
     const urlObj = new URL(currentTabUrl);
     currentUrlEl.textContent = urlObj.hostname;
 
+// Auto-run scan on open
     await runScan();
   } catch (error) {
     currentUrlEl.textContent = "Unable to detect current tab.";
@@ -158,6 +175,7 @@ async function initialisePopup() {
   }
 }
 
+// Button actions
 scanBtn.addEventListener("click", async () => {
   await runScan();
 });
@@ -170,4 +188,5 @@ openSiteBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: target });
 });
 
+// Start extension
 initialisePopup();

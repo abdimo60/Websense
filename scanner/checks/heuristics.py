@@ -21,7 +21,7 @@ class HeuristicResult:
     brand_spoof_detected: bool
 
 
-# Count how many subdomains are used
+# Count subdomains in host
 def _subdomain_depth(host: str) -> int:
     if not host:
         return 0
@@ -31,7 +31,7 @@ def _subdomain_depth(host: str) -> int:
     return len(parts) - 2
 
 
-# Check if host is a raw IP
+# Check if host is an IP address
 def _is_ip_host(host: str) -> bool:
     if not host:
         return False
@@ -42,7 +42,7 @@ def _is_ip_host(host: str) -> bool:
         return False
 
 
-# Detect punycode (used in lookalike domains)
+# Detect punycode in hostname
 def _has_punycode(host: str) -> bool:
     if not host:
         return False
@@ -54,7 +54,7 @@ def _has_numeric_ip_url(url: str) -> bool:
     return bool(re.match(r"^https?://\d+\.\d+\.\d+\.\d+", url.strip(), re.IGNORECASE))
 
 
-# Break URL into words for keyword checks
+# Split URL into words for keyword checks
 def _tokenise_url_parts(host: str, path: str) -> List[str]:
     combined = f"{host} {path}".lower()
     return [t for t in re.split(r"[^a-z0-9]+", combined) if t]
@@ -71,11 +71,11 @@ def _has_suspicious_keywords(host: str, path: str) -> bool:
         "bank", "payment", "billing"
     }
 
-    # Needs at least 2 hits to count
+    # Require at least 2 keyword matches
     return sum(1 for t in tokens if t in keywords) >= 2
 
 
-# Check for fake brand-style domains
+# Check for brand spoofing patterns
 def _has_brand_spoof_pattern(host: str) -> bool:
     if not host:
         return False
@@ -100,7 +100,7 @@ def _has_brand_spoof_pattern(host: str) -> bool:
     return brand_present and suspicious_present
 
 
-# Main heuristic check
+# Main URL heuristic check
 def check_heuristics(
     url: str,
     url_len_threshold: int = 100,
@@ -124,42 +124,42 @@ def check_heuristics(
     suspicious = False
     triggered_count = 0
 
-    # Long URLs can hide intent
+    # Long URLs can be suspicious
     if url_length >= url_len_threshold:
         suspicious = True
         triggered_count += 1
         reasons.append(f"Long URL ({url_length} chars).")
         score_delta -= 10
 
-    # Too many subdomains is suspicious
+    # Too many subdomains can be suspicious
     if subdomain_depth >= subdomain_threshold:
         suspicious = True
         triggered_count += 1
         reasons.append(f"High subdomain depth ({subdomain_depth}).")
         score_delta -= 15
 
-    # IP instead of domain
+    # IP address instead of normal domain
     if ip_host or numeric_ip_url:
         suspicious = True
         triggered_count += 1
         reasons.append("Uses a numeric IP instead of a normal domain.")
         score_delta -= 20
 
-    # Punycode detection
+    # Punycode may indicate lookalike domains
     if punycode_detected:
         suspicious = True
         triggered_count += 1
         reasons.append("Uses punycode (possible lookalike domain).")
         score_delta -= 20
 
-    # Suspicious keywords
+    # Login style phishing keywords
     if suspicious_keywords_detected:
         suspicious = True
         triggered_count += 1
         reasons.append("Contains multiple suspicious login-related keywords.")
         score_delta -= 15
 
-    # Brand spoofing pattern
+    # Spoofed brand-style structure
     if brand_spoof_detected:
         suspicious = True
         triggered_count += 1
